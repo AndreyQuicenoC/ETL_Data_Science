@@ -1,0 +1,113 @@
+dim_fecha: |
+  CREATE TABLE IF NOT EXISTS dim_fecha (
+      key_dim_fecha SERIAL NOT NULL PRIMARY KEY,
+      date          TIMESTAMP,
+      year          INTEGER,
+      month         INTEGER,
+      day           INTEGER,
+      weekday       INTEGER,
+      quarter       INTEGER,
+      day_of_year   INTEGER,
+      day_of_month  INTEGER,
+      month_str     TEXT,
+      day_str       TEXT,
+      date_str      TEXT,
+      "is_Holiday"  BOOLEAN,
+      holiday       TEXT,
+      weekend       BOOLEAN,
+      saved         DATE
+  );
+
+dim_tiempo: |
+  CREATE TABLE IF NOT EXISTS dim_tiempo (
+      key_dim_tiempo SERIAL NOT NULL PRIMARY KEY,
+      hora           INTEGER,
+      franja_horaria TEXT,
+      periodo_dia    TEXT,
+      saved          DATE
+  );
+
+dim_ubicacion: |
+  CREATE TABLE IF NOT EXISTS dim_ubicacion (
+      key_dim_ubicacion SERIAL NOT NULL PRIMARY KEY,
+      id_sede           INTEGER,
+      sede_nombre       TEXT,
+      sede_direccion    TEXT,
+      sede_telefono     TEXT,
+      id_cliente        INTEGER,
+      nombre_cliente    TEXT,
+      nit_cliente       TEXT,
+      sector_cliente    TEXT,
+      tipo_cliente      TEXT,
+      id_ciudad         INTEGER,
+      ciudad            TEXT,
+      id_departamento   INTEGER,
+      departamento      TEXT,
+      saved             DATE
+  );
+
+dim_mensajero: |
+  CREATE TABLE IF NOT EXISTS dim_mensajero (
+      key_dim_mensajero SERIAL NOT NULL PRIMARY KEY,
+      id_mensajero      BIGINT,
+      username          TEXT,
+      nombre            TEXT,
+      telefono          TEXT,
+      activo            BOOLEAN,
+      id_ciudad_operacion INTEGER,
+      ciudad_operacion  TEXT,
+      tipo_vehiculo     TEXT,
+      saved             DATE
+  );
+
+dim_estado: |
+  CREATE TABLE IF NOT EXISTS dim_estado (
+      key_dim_estado SERIAL NOT NULL PRIMARY KEY,
+      id_estado      INTEGER,
+      nombre         TEXT,
+      descripcion    TEXT,
+      saved          DATE
+  );
+
+dim_tipo_novedad: |
+  CREATE TABLE IF NOT EXISTS dim_tipo_novedad (
+      key_dim_tipo_novedad SERIAL NOT NULL PRIMARY KEY,
+      id_tipo_novedad      INTEGER,
+      nombre               TEXT,
+      saved                DATE
+  );
+
+hecho_servicios: |
+  CREATE TABLE IF NOT EXISTS hecho_servicios (
+      key_hecho_servicios      SERIAL NOT NULL PRIMARY KEY,
+      id_servicio              INTEGER,
+      key_dim_fecha            BIGINT REFERENCES dim_fecha(key_dim_fecha),
+      key_dim_tiempo           BIGINT REFERENCES dim_tiempo(key_dim_tiempo),
+      key_dim_ubicacion        BIGINT REFERENCES dim_ubicacion(key_dim_ubicacion),
+      key_dim_mensajero        BIGINT REFERENCES dim_mensajero(key_dim_mensajero),
+      key_dim_estado           BIGINT REFERENCES dim_estado(key_dim_estado),
+      cantidad_servicios       INTEGER,
+      cantidad_paquetes        INTEGER,
+      tiempo_total_minutos     DOUBLE PRECISION,
+      tiempo_fase_asignacion   DOUBLE PRECISION,
+      tiempo_fase_recogida     DOUBLE PRECISION,
+      tiempo_fase_entrega      DOUBLE PRECISION,
+      tiempo_fase_cierre       DOUBLE PRECISION,
+      es_prueba                BOOLEAN,
+      saved                    DATE
+  );
+
+hecho_novedades: |
+  CREATE TABLE IF NOT EXISTS hecho_novedades (
+      key_hecho_novedades      SERIAL NOT NULL PRIMARY KEY,
+      id_novedad               INTEGER,
+      key_dim_fecha            BIGINT REFERENCES dim_fecha(key_dim_fecha),
+      key_dim_tiempo           BIGINT REFERENCES dim_tiempo(key_dim_tiempo),
+      key_dim_ubicacion        BIGINT REFERENCES dim_ubicacion(key_dim_ubicacion),
+      key_dim_mensajero        BIGINT REFERENCES dim_mensajero(key_dim_mensajero),
+      key_dim_tipo_novedad     BIGINT REFERENCES dim_tipo_novedad(key_dim_tipo_novedad),
+      key_dim_estado           BIGINT REFERENCES dim_estado(key_dim_estado),
+      cantidad_novedades       INTEGER,
+      es_prueba                BOOLEAN,
+      saved                    DATE
+  );

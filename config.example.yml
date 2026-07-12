@@ -1,0 +1,26 @@
+OLTP:
+  drivername: postgresql
+  dbname: proyecto_mensajeria
+  user: user_example
+  password: YOUR_PASSWORD
+  host: localhost
+  port: 5432
+
+ETL_PRO:
+  drivername: postgresql
+  dbname: olap_proyecto_mensajeria
+  user: user_example
+  password: YOUR_PASSWORD
+  host: localhost
+  port: 5432
+
+ADMIN:
+  drivername: postgresql
+  dbname: postgres
+  user: postgres
+  password: YOUR_ADMIN_PASSWORD
+  host: localhost
+  port: 5432
+
+LOAD_DIMENSIONS: True
+FORCE_RELOAD: False

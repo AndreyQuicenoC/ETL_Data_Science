@@ -1,0 +1,43 @@
+# Virtual environments
+.venv/
+venv/
+my_env/
+env/
+
+# Local secrets / credentials
+config.yml
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+.git/gk/
+
+# Generated / local data artifacts
+dw_data/
+data/
+*.csv
+*.xlsx
+*.xls
+*.pbix
+*.db
+
+# Local helper scripts (not for remote)
+scripts/
+
+# Logs
+*.log

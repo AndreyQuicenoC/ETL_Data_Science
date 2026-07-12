@@ -1,0 +1,10 @@
+pandas>=2.0
+numpy>=1.24
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+PyYAML>=6.0
+holidays>=0.40
+python-dateutil>=2.9
+ipykernel>=6.29
+jupyter>=1.0
+notebook>=7.0
