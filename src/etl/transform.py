@@ -30,17 +30,30 @@ def _fill_text_nulls(df: DataFrame, columns=None) -> DataFrame:
 
 
 def _franja_horaria(hora: int) -> str:
-    """Business time slots (exact minutes are not required)."""
     if pd.isna(hora):
         return NA_TEXT
-    h = int(hora)
-    if 0 <= h <= 5:
-        return "Madrugada (00-05)"
-    if 6 <= h <= 11:
-        return "Manana (06-11)"
-    if 12 <= h <= 17:
-        return "Tarde (12-17)"
-    return "Noche (18-23)"
+
+    inicio = (int(hora) // 2) * 2
+    fin = inicio + 1
+
+    descripciones = {
+        0: "Medianoche",
+        2: "Madrugada",
+        4: "Amanecer",
+        6: "Mañana temprano",
+        8: "Mañana",
+        10: "Media mañana",
+        12: "Mediodía",
+        14: "Tarde",
+        16: "Tarde",
+        18: "Atardecer",
+        20: "Noche",
+        22: "Noche",
+    }
+
+    periodo = descripciones.get(inicio, "Horario")
+
+    return f"{periodo} ({inicio:02d}:00 - {fin:02d}:59)"
 
 
 def _periodo_dia(hora: int) -> str:
@@ -126,9 +139,17 @@ def transform_ubicacion(args) -> DataFrame:
 
 def transform_mensajero(args) -> DataFrame:
     mensajero, vehiculo = args
+
     if not vehiculo.empty:
-        vehiculo = vehiculo.sort_values(["id_mensajero", "n"], ascending=[True, False])
-        vehiculo = vehiculo.drop_duplicates(subset=["id_mensajero"], keep="first")
+        vehiculo = vehiculo.sort_values(
+            ["id_mensajero", "n"],
+            ascending=[True, False]
+        )
+        vehiculo = vehiculo.drop_duplicates(
+            subset=["id_mensajero"],
+            keep="first"
+        )
+
         mensajero = mensajero.merge(
             vehiculo[["id_mensajero", "tipo_vehiculo"]],
             on="id_mensajero",
@@ -137,11 +158,16 @@ def transform_mensajero(args) -> DataFrame:
     else:
         mensajero["tipo_vehiculo"] = NA_TEXT
 
-    mensajero["nombre"] = mensajero["nombre"].replace({"": np.nan, " ": np.nan})
-    mensajero["nombre"] = mensajero["nombre"].fillna(mensajero["username"])
+    # Usar siempre el username como nombre del mensajero
+    mensajero["nombre"] = mensajero["username"]
+
     mensajero = _fill_text_nulls(mensajero)
     mensajero["activo"] = mensajero["activo"].fillna(False)
-    mensajero["id_ciudad_operacion"] = mensajero["id_ciudad_operacion"].fillna(-1).astype("Int64")
+    mensajero["id_ciudad_operacion"] = (
+        mensajero["id_ciudad_operacion"]
+        .fillna(-1)
+        .astype("Int64")
+    )
     mensajero.drop(columns=["user_id"], inplace=True, errors="ignore")
 
     unknown = pd.DataFrame(
