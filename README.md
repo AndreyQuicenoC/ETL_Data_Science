@@ -1,6 +1,6 @@
 # ETL_Ciencia_De_Datos
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](./VERSION)
 [![Python](https://img.shields.io/badge/python-3.11%2B-yellow.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-12%2B-336791.svg)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
