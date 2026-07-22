@@ -15,6 +15,49 @@ ESTADO_CERRADO = 6
 
 NA_TEXT = "NO APLICA"
 
+# SLA caps (minutes): P99 of operational durations + margin for closure lag.
+# Values above cap are invalid timestamps — set to NULL so AVG excludes them.
+_DURATION_CAPS_MINUTES = {
+    "tiempo_fase_asignacion": 1440,
+    "tiempo_fase_recogida": 1440,
+    "tiempo_fase_entrega": 1440,
+    "tiempo_fase_cierre": 2880,
+    "tiempo_total_minutos": 4320,
+}
+
+
+def _nullify_duration_outliers(df: DataFrame) -> DataFrame:
+    for col, cap in _DURATION_CAPS_MINUTES.items():
+        if col not in df.columns:
+            continue
+        mask = df[col].notna() & (df[col] > cap)
+        n = int(mask.sum())
+        if n:
+            df.loc[mask, col] = np.nan
+            print(f"[*] hecho_servicios: nullified {n} outlier values in {col} (>{cap} min)")
+    return df
+
+
+# P99 of service-day incident counts in OLTP (~7). Caps burst registration noise
+# (e.g. 38 clicks/day on one service) while keeping all non-prueba records intact.
+_MAX_NOVEDADES_POR_SERVICIO_DIA = 7
+
+
+def _cap_novedad_burst_outliers(df: DataFrame) -> DataFrame:
+    """Keep at most N novedades per service per calendar day (first by id_novedad)."""
+    if df.empty or "id_servicio" not in df.columns or "date_only" not in df.columns:
+        return df
+    df = df.sort_values(["id_servicio", "date_only", "id_novedad"])
+    rank = df.groupby(["id_servicio", "date_only"]).cumcount() + 1
+    mask = rank <= _MAX_NOVEDADES_POR_SERVICIO_DIA
+    dropped = int((~mask).sum())
+    if dropped:
+        print(
+            f"[*] hecho_novedades: dropped {dropped} burst outlier rows "
+            f"(>{_MAX_NOVEDADES_POR_SERVICIO_DIA} per servicio/day, P99 cap)"
+        )
+    return df.loc[mask].copy()
+
 
 def _fill_text_nulls(df: DataFrame, columns=None) -> DataFrame:
     """Replace null/blank values so downstream merges and loads do not fail."""
@@ -387,6 +430,8 @@ def transform_hecho_servicios(args) -> DataFrame:
     if dropped:
         print(f"[*] hecho_servicios: dropped {dropped} rows without fecha/tiempo keys")
 
+    hecho = _nullify_duration_outliers(hecho)
+
     hecho["saved"] = date.today()
     cols = [
         "id_servicio",
@@ -431,6 +476,8 @@ def transform_hecho_novedades(args) -> DataFrame:
     df["fecha_novedad"] = df["fecha_novedad"].dt.tz_convert(None)
     df["date_only"] = df["fecha_novedad"].dt.date
     df["hora"] = df["fecha_novedad"].dt.hour
+
+    df = _cap_novedad_burst_outliers(df)
 
     dim_fecha = dim_fecha.copy()
     dim_fecha["date_only"] = pd.to_datetime(dim_fecha["date"]).dt.date
