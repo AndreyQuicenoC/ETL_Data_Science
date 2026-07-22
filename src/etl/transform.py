@@ -15,8 +15,7 @@ ESTADO_CERRADO = 6
 
 NA_TEXT = "NO APLICA"
 
-# SLA caps (minutes): P99 of operational durations + margin for closure lag.
-# Values above cap are invalid timestamps — set to NULL so AVG excludes them.
+# Max minutes per phase; longer values are treated as bad data and cleared.
 _DURATION_CAPS_MINUTES = {
     "tiempo_fase_asignacion": 1440,
     "tiempo_fase_recogida": 1440,
@@ -27,6 +26,7 @@ _DURATION_CAPS_MINUTES = {
 
 
 def _nullify_duration_outliers(df: DataFrame) -> DataFrame:
+    # Keeps the service row but clears times that would skew averages in reports.
     for col, cap in _DURATION_CAPS_MINUTES.items():
         if col not in df.columns:
             continue
@@ -38,8 +38,7 @@ def _nullify_duration_outliers(df: DataFrame) -> DataFrame:
     return df
 
 
-# P99 of service-day incident counts in OLTP (~7). Caps burst registration noise
-# (e.g. 38 clicks/day on one service) while keeping all non-prueba records intact.
+# Max incidents kept per service per day to ignore repeated test clicks.
 _MAX_NOVEDADES_POR_SERVICIO_DIA = 7
 
 
@@ -76,6 +75,7 @@ def _franja_horaria(hora: int) -> str:
     if pd.isna(hora):
         return NA_TEXT
 
+    # Each hour belongs to a 2-hour label used for peak-time charts.
     inicio = (int(hora) // 2) * 2
     fin = inicio + 1
 
@@ -184,6 +184,7 @@ def transform_mensajero(args) -> DataFrame:
     mensajero, vehiculo = args
 
     if not vehiculo.empty:
+        # Keep the vehicle type this messenger uses most often.
         vehiculo = vehiculo.sort_values(
             ["id_mensajero", "n"],
             ascending=[True, False]
@@ -201,7 +202,7 @@ def transform_mensajero(args) -> DataFrame:
     else:
         mensajero["tipo_vehiculo"] = NA_TEXT
 
-    # Usar siempre el username como nombre del mensajero
+    # Use login name as the display name shown in dashboards.
     mensajero["nombre"] = mensajero["username"]
 
     mensajero = _fill_text_nulls(mensajero)
@@ -274,22 +275,22 @@ def _minutes_between(start, end):
     if pd.isna(start) or pd.isna(end):
         return np.nan
     minutes = (end - start).total_seconds() / 60.0
-    # Out-of-order operational timestamps become null instead of negative durations
+    # Ignore negative gaps when status timestamps arrive in the wrong order.
     return minutes if minutes >= 0 else np.nan
 
 
-def _first_timestamp(group: DataFrame, estado_id: int):
-    subset = group[group["id_estado"] == estado_id].sort_values("ts")
-    if subset.empty:
-        return pd.NaT
-    return subset.iloc[0]["ts"]
+# def _first_timestamp(group: DataFrame, estado_id: int):
+#     subset = group[group["id_estado"] == estado_id].sort_values("ts")
+#     if subset.empty:
+#         return pd.NaT
+#     return subset.iloc[0]["ts"]
 
 
-def _last_estado_id(group: DataFrame):
-    subset = group.sort_values("ts")
-    if subset.empty:
-        return -1
-    return int(subset.iloc[-1]["id_estado"])
+# def _last_estado_id(group: DataFrame):
+#     subset = group.sort_values("ts")
+#     if subset.empty:
+#         return -1
+#     return int(subset.iloc[-1]["id_estado"])
 
 
 def transform_hecho_servicios(args) -> DataFrame:
@@ -307,7 +308,7 @@ def transform_hecho_servicios(args) -> DataFrame:
 
     servicios = servicios.merge(documentos, on="id_servicio", how="left")
     servicios["cantidad_paquetes"] = servicios["cantidad_paquetes"].fillna(0).astype(int)
-    servicios["cantidad_servicios"] = 1
+    servicios["cantidad_servicios"] = 1  # One fact row represents one service.
 
     estados["ts"] = [
         _combine_fecha_hora(f, h) for f, h in zip(estados["fecha"], estados["hora"])
@@ -315,11 +316,13 @@ def transform_hecho_servicios(args) -> DataFrame:
     estados = estados[~estados["ts"].isna()].copy()
     estados = estados.sort_values(["id_servicio", "ts"])
 
+    # Latest status on record is stored as the service's current state.
     last_estado = (
         estados.groupby("id_servicio", as_index=False)
         .tail(1)[["id_servicio", "id_estado"]]
         .rename(columns={"id_estado": "id_estado_actual"})
     )
+    # First time each status was reached becomes one column per service.
     first_by_state = (
         estados.groupby(["id_servicio", "id_estado"], as_index=False)["ts"]
         .first()
@@ -355,6 +358,7 @@ def transform_hecho_servicios(args) -> DataFrame:
         _minutes_between(a, b)
         for a, b in zip(fases["ts_entregado"], fases["ts_cerrado"])
     ]
+    # Use the nearest available start and end when a status was never recorded.
     start_total = fases["ts_iniciado"].fillna(fases["ts_asignado"])
     end_total = fases["ts_cerrado"].fillna(fases["ts_entregado"])
     fases["tiempo_total_minutos"] = [
@@ -411,10 +415,6 @@ def transform_hecho_servicios(args) -> DataFrame:
     unknown_ubic = dim_ubicacion.loc[dim_ubicacion["id_sede"] == -1, "key_dim_ubicacion"]
     unknown_mens = dim_mensajero.loc[dim_mensajero["id_mensajero"] == -1, "key_dim_mensajero"]
     unknown_est = dim_estado.loc[dim_estado["id_estado"] == -1, "key_dim_estado"]
-    unknown_time = None
-    if (dim_tiempo["hora"] == 0).any() and hecho["key_dim_tiempo"].isna().any():
-        # keep NaN only if hour invalid; map invalid hour to unknown via hora 0? better leave and drop only if fecha missing
-        pass
 
     if not unknown_ubic.empty:
         hecho["key_dim_ubicacion"] = hecho["key_dim_ubicacion"].fillna(unknown_ubic.iloc[0])
@@ -472,11 +472,12 @@ def transform_hecho_novedades(args) -> DataFrame:
     df["cantidad_novedades"] = 1
 
     df["fecha_novedad"] = pd.to_datetime(df["fecha_novedad"], errors="coerce", utc=True)
-    # normalize to naive local-like timestamp for date/hour extraction
+    # Drop timezone info so date and hour match the calendar and clock dimensions.
     df["fecha_novedad"] = df["fecha_novedad"].dt.tz_convert(None)
     df["date_only"] = df["fecha_novedad"].dt.date
     df["hora"] = df["fecha_novedad"].dt.hour
 
+    # Clean novedades outliers
     df = _cap_novedad_burst_outliers(df)
 
     dim_fecha = dim_fecha.copy()
@@ -504,7 +505,7 @@ def transform_hecho_novedades(args) -> DataFrame:
         how="left",
     )
 
-    # Optional estado link: novedades often relate to estado "Con novedad"
+    # Tag every incident with the shared "with incident" status for reporting.
     estado_nov = dim_estado.loc[dim_estado["id_estado"] == ESTADO_NOVEDAD, "key_dim_estado"]
     unknown_est = dim_estado.loc[dim_estado["id_estado"] == -1, "key_dim_estado"]
     if not estado_nov.empty:

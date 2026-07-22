@@ -12,6 +12,7 @@ def load_hecho_novedades(hecho_novedades: DataFrame, etl_conn: Engine, replace: 
 
 
 def truncate_warehouse(etl_conn: Engine):
+    # Delete facts first because they reference the dimension tables.
     order = [
         'hecho_novedades',
         'hecho_servicios',
@@ -38,6 +39,7 @@ def load(table: DataFrame, etl_conn: Engine, tname, replace: bool = False):
     if replace:
         with etl_conn.begin() as conn:
             conn.execute(text(f'Delete from {tname}'))
+        # Rows are appended after the delete, so replace means a full table refresh.
         table.to_sql(f'{tname}', etl_conn, if_exists='append', index=False)
     else:
         table.to_sql(f'{tname}', etl_conn, if_exists='append', index=False)

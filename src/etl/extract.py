@@ -74,6 +74,7 @@ def extract_mensajero(conection: Engine):
         """,
         conection,
     )
+    # Vehicle counts are used later to pick each messenger's most common vehicle type.
     return [mensajero, vehiculo]
 
 
@@ -103,6 +104,7 @@ def extract_servicios_oltp(conection: Engine):
         """,
         conection,
     )
+    # State history rows are used to measure how long each service phase took.
     estados = pd.read_sql_query(
         """
         SELECT es.servicio_id AS id_servicio,
@@ -153,6 +155,7 @@ def extract_novedades_oltp(conection: Engine):
 def extract_hecho_servicios(etl_conn: Engine, oltp_conn: Engine):
     """Extract OLTP service sources plus already-loaded dimensions from OLAP."""
     servicios, estados, documentos = extract_servicios_oltp(oltp_conn)
+    # Dimensions are read from OLAP to map business ids to warehouse surrogate keys.
     dim_fecha = pd.read_sql_table("dim_fecha", etl_conn)
     dim_tiempo = pd.read_sql_table("dim_tiempo", etl_conn)
     dim_ubicacion = pd.read_sql_table("dim_ubicacion", etl_conn)
@@ -163,7 +166,9 @@ def extract_hecho_servicios(etl_conn: Engine, oltp_conn: Engine):
 
 
 def extract_hecho_novedades(etl_conn: Engine, oltp_conn: Engine):
+    """Extract OLTP incidents plus already-loaded dimensions from OLAP."""
     novedades = extract_novedades_oltp(oltp_conn)
+    # Dimensions are read from OLAP to map business ids to warehouse surrogate keys.
     dim_fecha = pd.read_sql_table("dim_fecha", etl_conn)
     dim_tiempo = pd.read_sql_table("dim_tiempo", etl_conn)
     dim_ubicacion = pd.read_sql_table("dim_ubicacion", etl_conn)
